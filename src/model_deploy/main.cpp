@@ -1,222 +1,125 @@
 #include "uLCD_4DGL.h"
-
 #include "DA7212.h"
-
 #include "accelerometer_handler.h"
-
 #include "config.h"
-
 #include "magic_wand_model_data.h"
-
-
 #include "tensorflow/lite/c/common.h"
-
 #include "tensorflow/lite/micro/kernels/micro_ops.h"
-
 #include "tensorflow/lite/micro/micro_error_reporter.h"
-
 #include "tensorflow/lite/micro/micro_interpreter.h"
-
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
-
 #include "tensorflow/lite/schema/schema_generated.h"
-
 #include "tensorflow/lite/version.h"
-
 #include <cmath>
 
-
-
 #define bufferLength (32)
-
 #define signalLength (1024)
 
-
 DA7212 audio;
-
 Serial pc(USBTX, USBRX);
 
-// The gesture index of the prediction
-
 int number =0;
-
 int gesture_index;
-
 int last_state =0;
-
 int first_print =0;
-
 int song =0;
-
 int now_song =0;
-
 int change_mode_show =0;
-
 int change_song =0;
 
 int16_t waveform[kAudioTxBufferSize];
-
 char serialInBuffer[bufferLength];
 
 uLCD_4DGL uLCD(D1, D0, D2);
-
 InterruptIn button(SW2);
-
 DigitalIn  Switch(SW3);
-
 DigitalOut green_led(LED2);
 
 EventQueue DNNqueue(32 * EVENTS_EVENT_SIZE);
-
 EventQueue playqueue(32 * EVENTS_EVENT_SIZE);
-
-Thread DNNthread(osPriorityNormal,80*1024/*120K stack size*/);
-
-Thread playthread(osPriorityNormal,80*1024/*120K stack size*/);
+Thread DNNthread(osPriorityNormal,80*1024);
+Thread playthread(osPriorityNormal,80*1024);
 
 int mode =0;
-
 int push =0;
-
 char list[3]={0x31, 0x32, 0x33};
-
 int main_page =0;
-
 int change_mode_in =0;
-
 int serialCount =0;
-
 float song_note[42];
-
 float noteLength[42];
 
 void loadSignal(void)
-
 {
-
   green_led = 0;
-
   int i = 0;
-
   serialCount = 0;
-
   audio.spk.pause();
-
   i = 0;
-  
   serialCount =0;
   while(i < 42)
-
   {
-
     if(pc.readable())
-
     {
-
       serialInBuffer[serialCount] = pc.getc();
-
       serialCount++;
-
       if(serialCount == 5)
-
       {
-
         serialInBuffer[serialCount] = '\0';
-
         song_note[i] = (float) atof(serialInBuffer);
-
         serialCount = 0;
-
-        //uLCD.printf('%.3f\n',song_note[i]);
-
         i++;
       }
-
     }
-
   }
   i =0;
   serialCount =0;
   while(i < 42)
-
   {
-
     if(pc.readable())
-
     {
-
       serialInBuffer[serialCount] = pc.getc();
-
       serialCount++;
-
       if(serialCount == 5)
-
       {
-
         serialInBuffer[serialCount] = '\0';
-
         noteLength[i] = (float) atof(serialInBuffer);
-
         serialCount = 0;
-
-        //uLCD.printf('%.3f\n',song_note[i]);
-
         i++;
       }
-
     }
-
   }
   green_led = 1;
-
 }
 
 
 void playNote(float freq[])
-
 {
   float frequency =  freq[number];
-  //(int16_t) (freq[number])*((1<<16)-1) ;
-
-
   for(int j = 0; (j < kAudioSampleFrequency / kAudioTxBufferSize)&& !push; ++j)
-
   {
     for (int i = 0; i < kAudioTxBufferSize; i++)
-
     {
-
     waveform[i] = (int16_t) (sin((double)i * 2. * M_PI/(double) (kAudioSampleFrequency /( 500*frequency))) * ((1<<16) - 1));
-
     }
-    
     audio.spk.play(waveform, kAudioTxBufferSize);
-
   }
-  // the loop below will play the note for the duration of 1s
-  //uLCD.printf("%d\r",number);
   if(number < 42){
     number = number +1;
   }
   else{
-    ;
+  ;
   }
-
-
 }
 
-void change_mode(){
-  
+void change_mode()
+{
   if(push ==0)
     push=1;
   else 
     push=0;
-
   first_print =1;
- //queue.call(mode_select);
-
 }
-// Return the result of the last prediction
 
 int PredictGesture(float* output) {
 
