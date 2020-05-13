@@ -33,25 +33,25 @@ char serialInBuffer[bufferLength];
 uLCD_4DGL uLCD(D1, D0, D2);
 InterruptIn button(SW2);
 DigitalIn  Switch(SW3);
-DigitalOut green_led(LED2);
+DigitalOut led(LED1);
 
 EventQueue DNNqueue(32 * EVENTS_EVENT_SIZE);
-EventQueue playqueue(32 * EVENTS_EVENT_SIZE);
+EventQueue songqueue(32 * EVENTS_EVENT_SIZE);
 Thread DNNthread(osPriorityNormal,80*1024);
-Thread playthread(osPriorityNormal,80*1024);
+Thread songthread(osPriorityNormal,80*1024);
 
 int mode =0;
 int push =0;
-char list[3]={0x31, 0x32, 0x33};
 int main_page =0;
 int change_mode_in =0;
 int serialCount =0;
 float song_note[42];
 float noteLength[42];
+char type[3]={0x31, 0x32, 0x33};
 
 void loadSignal(void)
 {
-  green_led = 0;
+  led = 0;
   int i = 0;
   serialCount = 0;
   audio.spk.pause();
@@ -89,7 +89,7 @@ void loadSignal(void)
       }
     }
   }
-  green_led = 1;
+  led = 1;
 }
 
 
@@ -112,7 +112,7 @@ void playNote(float freq[])
   }
 }
 
-void change_mode()
+void ISR1()
 {
   if(push ==0)
     push=1;
@@ -263,10 +263,10 @@ void DNN(){
 
 int main(int argc, char* argv[])
 {
-  green_led=0;
-  playthread.start(callback(&playqueue, &EventQueue::dispatch_forever));
+  led=0;
+  songthread.start(callback(&songqueue, &EventQueue::dispatch_forever));
   DNNthread.start(DNN);
-  button.rise(&change_mode); 
+  button.rise(&ISR1); 
   audio.spk.pause();
 
   while(true){
@@ -282,7 +282,7 @@ int main(int argc, char* argv[])
               song =2;
             uLCD.cls();
             uLCD.printf("Backward To \n\n\n\n\n");
-            uLCD.printf("%c",list[song]);
+            uLCD.printf("%c",type[song]);
           }
           if(mode==1){
             if(now_song < 2)
@@ -291,14 +291,14 @@ int main(int argc, char* argv[])
               song =0;
             uLCD.cls();
             uLCD.printf("Forward To \n\n\n\n\n");
-            uLCD.printf("%c",list[song]);
+            uLCD.printf("%c",type[song]);
           }
           if(mode==2){
             uLCD.cls();
             uLCD.printf("Change Songs\n\n\n\n\n");
-            uLCD.printf("%c\n",list[0]);
-            uLCD.printf("%c\n",list[1]);
-            uLCD.printf("%c\n",list[2]);
+            uLCD.printf("%c\n",type[0]);
+            uLCD.printf("%c\n",type[1]);
+            uLCD.printf("%c\n",type[2]);
           }  
         first_print=0;  
         }
@@ -333,7 +333,7 @@ int main(int argc, char* argv[])
             uLCD.cls();
             last_state=0;
             uLCD.printf("Backward To\n\n\n\n\n");
-            uLCD.printf("%c",list[song]); 
+            uLCD.printf("%c",type[song]); 
             main_page =0;
           }
         }
@@ -348,7 +348,7 @@ int main(int argc, char* argv[])
             uLCD.cls();
             last_state=0;
             uLCD.printf("Forward To\n\n\n\n\n");
-            uLCD.printf("%c",list[song]);
+            uLCD.printf("%c",type[song]);
             main_page =0;
           }
         }
@@ -357,9 +357,9 @@ int main(int argc, char* argv[])
             uLCD.cls();
             last_state=0;
             uLCD.printf("Change Songs\n\n\n\n\n");
-            uLCD.printf("%c\n",list[0]);
-            uLCD.printf("%c\n",list[1]);
-            uLCD.printf("%c\n",list[2]);
+            uLCD.printf("%c\n",type[0]);
+            uLCD.printf("%c\n",type[1]);
+            uLCD.printf("%c\n",type[2]);
             main_page =0;
           }
         if(Switch == 0){
@@ -408,14 +408,14 @@ int main(int argc, char* argv[])
         now_song = song;
         uLCD.cls();
         if(mode!=3){
-          uLCD.printf("MP3 Player\n\n\n\n\nNow:%c\n",list[now_song]);
+          uLCD.printf("MP3 Player\n\n\n\n\nNow:%c\n",type[now_song]);
         }
         else{
         ;  
         }
         main_page =1;
       }  
-      green_led=0;
+      led=0;
       if(change_song ==0){
         number =0;
         if(now_song ==0)
@@ -431,7 +431,7 @@ int main(int argc, char* argv[])
       int j=0;
       change_mode_in =0;
       while(change_song&&!push){
-        playqueue.call(playNote,song_note);
+        songqueue.call(playNote,song_note);
         wait(4*noteLength[number]);
       } 
     }
