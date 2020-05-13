@@ -1,5 +1,7 @@
-#include "uLCD_4DGL.h"
+#include "mbed.h"
+#include <cmath>
 #include "DA7212.h"
+
 #include "accelerometer_handler.h"
 #include "config.h"
 #include "magic_wand_model_data.h"
@@ -10,7 +12,8 @@
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
 #include "tensorflow/lite/schema/schema_generated.h"
 #include "tensorflow/lite/version.h"
-#include <cmath>
+
+#include "uLCD_4DGL.h"
 
 #define bufferLength (32)
 #define signalLength (1024)
@@ -18,35 +21,63 @@
 DA7212 audio;
 Serial pc(USBTX, USBRX);
 
-int number =0;
+int note=0;
 int gesture_index;
-int last_state =0;
-int first_print =0;
-int song =0;
-int now_song =0;
-int change_mode_show =0;
-int change_song =0;
+int last=0;
+int first=0;
+int new_song=0;
+int song=0;
+int display=0;
+int change=0;
 
 int16_t waveform[kAudioTxBufferSize];
 char serialInBuffer[bufferLength];
 
 uLCD_4DGL uLCD(D1, D0, D2);
 InterruptIn button(SW2);
-DigitalIn  Switch(SW3);
+DigitalIn  button2(SW3);
 
 EventQueue DNNqueue(32 * EVENTS_EVENT_SIZE);
 EventQueue songqueue(32 * EVENTS_EVENT_SIZE);
 Thread DNNthread(osPriorityNormal,80*1024);
 Thread songthread(osPriorityNormal,80*1024);
 
-int mode =0;
-int push =0;
-int main_page =0;
-int change_mode_in =0;
-int serialCount =0;
+int mode=0;
+int push=0;
+int main_page=0;
+int trigger=0;
+int serialCount=0;
 float song_note[42];
 float noteLength[42];
 char type[3]={0x31, 0x32, 0x33};
+
+void playNote(float freq[])
+{
+  float frequency =  freq[note];
+  for(int i = 0; (i < kAudioSampleFrequency / kAudioTxBufferSize)&& !push; ++i)
+  {
+    for (int j = 0; j < kAudioTxBufferSize; j++)
+    {
+    waveform[j] = (int16_t) (sin((double)i * 2. * M_PI/(double) (kAudioSampleFrequency /( 500*frequency))) * ((1<<16) - 1));
+    }
+    audio.spk.play(waveform, kAudioTxBufferSize);
+  }
+  if(note < 42){
+  note += 1 ;
+  }
+  else{
+  ;
+  }
+}
+
+void ISR1()
+{
+  if(push == 0)
+    push=1;
+  else 
+    push=0;
+  first=1;
+}
 
 void loadSignal(void)
 {
@@ -87,35 +118,6 @@ void loadSignal(void)
       }
     }
   }
-}
-
-
-void playNote(float freq[])
-{
-  float frequency =  freq[number];
-  for(int j = 0; (j < kAudioSampleFrequency / kAudioTxBufferSize)&& !push; ++j)
-  {
-    for (int i = 0; i < kAudioTxBufferSize; i++)
-    {
-    waveform[i] = (int16_t) (sin((double)i * 2. * M_PI/(double) (kAudioSampleFrequency /( 500*frequency))) * ((1<<16) - 1));
-    }
-    audio.spk.play(waveform, kAudioTxBufferSize);
-  }
-  if(number < 42){
-    number = number +1;
-  }
-  else{
-  ;
-  }
-}
-
-void ISR1()
-{
-  if(push ==0)
-    push=1;
-  else 
-    push=0;
-  first_print =1;
 }
 
 int PredictGesture(float* output) {
@@ -268,166 +270,162 @@ int main(int argc, char* argv[])
   while(true){
     if(push){
       audio.spk.pause();
-      if(change_mode_in ==0)
+      if(trigger == 0)
       {
-        if(first_print){
-          if(mode==0){
-            if(now_song > 1)
-              song = now_song -1;
+        if(first){
+          if(mode == 0){
+            if(song > 1)
+              new_song = song-1;
             else 
-              song =2;
+              new_song = 2;
             uLCD.cls();
             uLCD.printf("Backward To \n\n\n\n\n");
-            uLCD.printf("%c",type[song]);
+            uLCD.printf("%c",type[new_song]);
           }
-          if(mode==1){
-            if(now_song < 2)
-              song = now_song +1;
+          if(mode == 1){
+            if(song < 2)
+              new_song = song+1;
             else 
-              song =0;
+              new_song = 0;
             uLCD.cls();
             uLCD.printf("Forward To \n\n\n\n\n");
-            uLCD.printf("%c",type[song]);
+            uLCD.printf("%c",type[new_song]);
           }
-          if(mode==2){
+          if(mode == 2){
             uLCD.cls();
             uLCD.printf("Change Songs\n\n\n\n\n");
             uLCD.printf("%c\n",type[0]);
             uLCD.printf("%c\n",type[1]);
             uLCD.printf("%c\n",type[2]);
           }  
-        first_print=0;  
+        first = 0;  
         }
-        if(gesture_index ==0){
-          last_state=1;
-          if(mode<1)
-            mode=3;
+        if(gesture_index == 0){
+          last = 1;
+          if(mode < 1)
+            mode = 3;
           else
           {
-            mode=mode-1;
+            mode -= 1;
           }
-          change_song =0;
+          change = 0;
         }
-        if(gesture_index ==1){
-          last_state=1;
-          if(mode>2)
-            mode=0;
+        if(gesture_index == 1){
+          last = 1;
+          if(mode > 2)
+            mode = 0;
           else
           {
-            mode=mode+1;
+            mode += 1;
           }
-          change_song =0;
+          change = 0;
         }
-        if(mode==0){
-          if(last_state){        
-            if(mode==0){
-              if(now_song > 0)
-                song = now_song -1;
+        if(mode == 0){
+          if(last){        
+            if(mode == 0){
+              if(song > 0)
+                new_song = song-1;
               else 
-                song =2;  
+                new_song = 2;  
             }
             uLCD.cls();
-            last_state=0;
+            last = 0;
             uLCD.printf("Backward To\n\n\n\n\n");
-            uLCD.printf("%c",type[song]); 
-            main_page =0;
+            uLCD.printf("%c",type[new_song]); 
+            main_page = 0;
           }
         }
-        if(mode==1){
-          if(last_state){
+        if(mode == 1){
+          if(last){
             if(mode==1){
-              if(now_song < 2)
-                song = now_song +1;
+              if(song < 2)
+                new_song = song+1;
               else 
-                song =0;  
+                new_song = 0;  
             }
             uLCD.cls();
-            last_state=0;
+            last = 0;
             uLCD.printf("Forward To\n\n\n\n\n");
-            uLCD.printf("%c",type[song]);
-            main_page =0;
+            uLCD.printf("%c",type[new_song]);
+            main_page = 0;
           }
         }
-        if(mode==2){
-          if(last_state){
+        if(mode == 2){
+          if(last){
             uLCD.cls();
-            last_state=0;
+            last = 0;
             uLCD.printf("Change Songs\n\n\n\n\n");
-            uLCD.printf("%c\n",type[0]);
-            uLCD.printf("%c\n",type[1]);
-            uLCD.printf("%c\n",type[2]);
-            main_page =0;
+            main_page=0;
           }
-        if(Switch == 0){
-            change_mode_in =1;
+        if(button2 == 0){
+            trigger = 1;
         }
       }
     }
-    if(change_mode_in ==1){
-        if(gesture_index ==0){
-          change_mode_show =0;
-          if(now_song<1)
-            now_song=2;
+    if(trigger == 1){
+        if(gesture_index == 0){
+          display = 0;
+          if(song>1)
+            song -= 1;
           else
           {
-            now_song=now_song-1;
+            song = 2;
           }
         }
-        if(gesture_index ==1){
-          change_mode_show =0;
-          if(now_song>1)
-            now_song=0;
+        if(gesture_index == 1){
+          display = 0;
+          if(song < 1)
+            song += 1;
           else
           {
-            now_song=now_song+1;
+            song = 0;
           }
         }
-        song=now_song;
-        if(change_mode_show ==0){
+        new_song = song;
+        if(display == 0){
           uLCD.cls();
-          change_mode_show =1;
+          display = 1;
           uLCD.printf("Change Songs\n\n\n\n\n");
-          if(now_song == 0){
+          if(song == 0){
             uLCD.printf("Song1\n");
           }
-          if(now_song == 1){
+          if(song == 1){
             uLCD.printf("Song2\n");
           }
-          if(now_song == 2){          
+          if(song == 2){          
             uLCD.printf("Song3\n");   
           }
         }
     }
   }
     else{
-      if(main_page ==0){
-        now_song = song;
+      if(main_page == 0){
+        song = new_song;
         uLCD.cls();
-        if(mode!=3){
-          uLCD.printf("MP3 Player\n\n\n\n\nNow:%c\n",type[now_song]);
+        if(mode != 3){
+          uLCD.printf("MP3 Player\n\n\n\n\nNow:%c\n",type[song]);
         }
         else{
         ;  
         }
-        main_page =1;
+        main_page = 1;
       }  
-      if(change_song ==0){
-        number =0;
-        if(now_song ==0)
+      if(change == 0){
+        note =0;
+        if(song == 0)
           pc.printf("%d\r\n",1);
-        if(now_song ==1)
+        if(song == 1)
           pc.printf("%d\r\n",2);
-        if(now_song ==2)
+        if(song == 2)
           pc.printf("%d\r\n",3);
         loadSignal();
-        change_song =1;
+        change = 1;
         pc.printf("%d\r\n",0);
       }
-      int j=0;
-      change_mode_in =0;
-      while(change_song&&!push){
+      trigger = 0;
+      while(change&&!push){
         songqueue.call(playNote,song_note);
-        wait(4*noteLength[number]);
+        wait(4*noteLength[note]);
       } 
     }
   }
