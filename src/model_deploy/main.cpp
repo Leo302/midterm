@@ -42,8 +42,8 @@ EventQueue songqueue(32 * EVENTS_EVENT_SIZE);
 Thread DNNthread(osPriorityNormal,80*1024);
 Thread songthread(osPriorityNormal,80*1024);
 
+int sub_mode=0;
 int mode=0;
-int push=0;
 int main_page=0;
 int trigger=0;
 int serialCount=0;
@@ -54,11 +54,11 @@ char type[3]={0x31, 0x32, 0x33};
 void playNote(float freq[])
 {
   float frequency =  freq[note];
-  for(int i = 0; (i < kAudioSampleFrequency / kAudioTxBufferSize)&& !push; ++i)
+  for(int i = 0; (i < kAudioSampleFrequency / kAudioTxBufferSize)&& !mode; ++i)
   {
     for (int j = 0; j < kAudioTxBufferSize; j++)
     {
-    waveform[j] = (int16_t) (sin((double)i * 2. * M_PI/(double) (kAudioSampleFrequency /( 500*frequency))) * ((1<<16) - 1));
+    waveform[j] = (int16_t) (sin((double)j * 2. * M_PI/(double) (kAudioSampleFrequency /( 500*frequency))) * ((1<<16) - 1));
     }
     audio.spk.play(waveform, kAudioTxBufferSize);
   }
@@ -72,10 +72,10 @@ void playNote(float freq[])
 
 void ISR1()
 {
-  if(push == 0)
-    push=1;
+  if(mode == 0)
+    mode=1;
   else 
-    push=0;
+    mode=0;
   first=1;
 }
 
@@ -268,12 +268,12 @@ int main(int argc, char* argv[])
   audio.spk.pause();
 
   while(true){
-    if(push){
+    if(mode){
       audio.spk.pause();
       if(trigger == 0)
       {
         if(first){
-          if(mode == 0){
+          if(sub_mode == 0){
             if(song > 1)
               new_song = song-1;
             else 
@@ -282,7 +282,7 @@ int main(int argc, char* argv[])
             uLCD.printf("Backward To \n\n\n\n\n");
             uLCD.printf("%c",type[new_song]);
           }
-          if(mode == 1){
+          if(sub_mode == 1){
             if(song < 2)
               new_song = song+1;
             else 
@@ -291,7 +291,7 @@ int main(int argc, char* argv[])
             uLCD.printf("Forward To \n\n\n\n\n");
             uLCD.printf("%c",type[new_song]);
           }
-          if(mode == 2){
+          if(sub_mode == 2){
             uLCD.cls();
             uLCD.printf("Change Songs\n\n\n\n\n");
             uLCD.printf("%c\n",type[0]);
@@ -302,27 +302,27 @@ int main(int argc, char* argv[])
         }
         if(gesture_index == 0){
           last = 1;
-          if(mode < 1)
-            mode = 3;
+          if(sub_mode < 1)
+            sub_mode = 3;
           else
           {
-            mode -= 1;
+            sub_mode -= 1;
           }
           change = 0;
         }
         if(gesture_index == 1){
           last = 1;
-          if(mode > 2)
-            mode = 0;
+          if(sub_mode > 2)
+            sub_mode = 0;
           else
           {
-            mode += 1;
+            sub_mode += 1;
           }
           change = 0;
         }
-        if(mode == 0){
+        if(sub_mode == 0){
           if(last){        
-            if(mode == 0){
+            if(sub_mode == 0){
               if(song > 0)
                 new_song = song-1;
               else 
@@ -335,9 +335,9 @@ int main(int argc, char* argv[])
             main_page = 0;
           }
         }
-        if(mode == 1){
+        if(sub_mode == 1){
           if(last){
-            if(mode==1){
+            if(sub_mode==1){
               if(song < 2)
                 new_song = song+1;
               else 
@@ -350,7 +350,7 @@ int main(int argc, char* argv[])
             main_page = 0;
           }
         }
-        if(mode == 2){
+        if(sub_mode == 2){
           if(last){
             uLCD.cls();
             last = 0;
@@ -402,7 +402,7 @@ int main(int argc, char* argv[])
       if(main_page == 0){
         song = new_song;
         uLCD.cls();
-        if(mode != 3){
+        if(sub_mode != 3){
           uLCD.printf("MP3 Player\n\n\n\n\nNow:%c\n",type[song]);
         }
         else{
@@ -423,7 +423,7 @@ int main(int argc, char* argv[])
         pc.printf("%d\r\n",0);
       }
       trigger = 0;
-      while(change&&!push){
+      while(change&&!mode){
         songqueue.call(playNote,song_note);
         wait(4*noteLength[note]);
       } 
