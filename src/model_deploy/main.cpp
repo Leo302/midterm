@@ -475,7 +475,7 @@ void DNN(){
 }
 int main(int argc, char* argv[])
 {
-  gerrn_led=0;
+  green_led=0;
   playthread.start(callback(&playqueue, &EventQueue::dispatch_forever));
   DNNthread.start(DNN);
   button.rise(&change_mode); 
