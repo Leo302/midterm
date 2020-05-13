@@ -33,7 +33,6 @@ char serialInBuffer[bufferLength];
 uLCD_4DGL uLCD(D1, D0, D2);
 InterruptIn button(SW2);
 DigitalIn  Switch(SW3);
-DigitalOut led(LED1);
 
 EventQueue DNNqueue(32 * EVENTS_EVENT_SIZE);
 EventQueue songqueue(32 * EVENTS_EVENT_SIZE);
@@ -51,7 +50,6 @@ char type[3]={0x31, 0x32, 0x33};
 
 void loadSignal(void)
 {
-  led = 0;
   int i = 0;
   serialCount = 0;
   audio.spk.pause();
@@ -89,7 +87,6 @@ void loadSignal(void)
       }
     }
   }
-  led = 1;
 }
 
 
@@ -263,7 +260,6 @@ void DNN(){
 
 int main(int argc, char* argv[])
 {
-  led=0;
   songthread.start(callback(&songqueue, &EventQueue::dispatch_forever));
   DNNthread.start(DNN);
   button.rise(&ISR1); 
@@ -415,7 +411,6 @@ int main(int argc, char* argv[])
         }
         main_page =1;
       }  
-      led=0;
       if(change_song ==0){
         number =0;
         if(now_song ==0)
