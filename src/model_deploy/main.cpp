@@ -24,6 +24,23 @@ Serial pc(USBTX, USBRX);
 int16_t waveform[kAudioTxBufferSize];
 char serialInBuffer[bufferLength];
 
+int mode=0;              // control interrupt
+int sub_mode=1;          // interfces totally 3
+int main_page=0;
+int trigger=1;           // control selection
+int serialCount=0;
+int note=0;
+int gesture_index;
+int first=0;             // initial
+int last=0;              // previous mode 
+int song=1;              // totally 3
+int new_song=1;          // the next song 
+int display=0;           // control display
+int change=0;            // control change
+float song_note[42];
+float noteLength[42];
+char type[4]={0x20, 0x31, 0x32, 0x33};
+
 uLCD_4DGL uLCD(D1, D0, D2);
 InterruptIn button(SW2);
 DigitalIn  button2(SW3);
@@ -33,24 +50,7 @@ EventQueue songqueue(32 * EVENTS_EVENT_SIZE);
 Thread DNNthread(osPriorityNormal,80*1024);
 Thread songthread(osPriorityNormal,80*1024);
 
-int mode=0;              // control interrupt
-int sub_mode=1;          // interfces totally 3
-int main_page=0;
-int trigger=1;           // control selection
-int serialCount=0;
-int note=0;
-int gesture_index;
-int first=0;
-int last=0;
-int song=1;              // totally 3
-int new_song=1;          // the next song 
-int display=0;
-int change=0;
-float song_note[42];
-float noteLength[42];
-char type[4]={0x20, 0x31, 0x32, 0x33};
-
-void playNote(float freq[])
+void playNote(float freq[])              
 {
   float frequency =  freq[note];
   for(int i = 0; (i < kAudioSampleFrequency / kAudioTxBufferSize)&& !mode; ++i)
@@ -67,15 +67,6 @@ void playNote(float freq[])
   else{
   ;
   }
-}
-
-void ISR1()
-{
-  if(mode == 0)
-    mode=1;       // song stop
-  else 
-    mode=0;       // song play
-  first=1;
 }
 
 void loadSignal(void)
@@ -117,6 +108,15 @@ void loadSignal(void)
       }
     }
   }
+}
+
+void ISR1()
+{
+  if(mode == 0)
+    mode=1;       // song stop
+  else 
+    mode=0;       // song play
+  first=1;
 }
 
 int PredictGesture(float* output) {
@@ -269,7 +269,7 @@ int main(int argc, char* argv[])
   while(true){
     if(mode){
       audio.spk.pause();      // interrupt in
-      if(trigger == 1)        // chage mode with DNN
+      if(trigger == 1)        // change mode with DNN
       {
         if(gesture_index == 0){
           last = 1;
@@ -394,7 +394,7 @@ int main(int argc, char* argv[])
     }
   }
     else{
-      if(main_page == 0){
+      if(main_page == 0){       // main page can display chosen songs
         song = new_song;
         uLCD.cls();
         if(sub_mode != 4){
