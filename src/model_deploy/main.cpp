@@ -293,26 +293,13 @@ int main(int argc, char* argv[])
               new_song = song-1;
             else 
               new_song = 3;
-            uLCD.cls();
-            uLCD.printf("Backward To \n\n\n\n\n");
-            uLCD.printf("%c",type[new_song]);
           }
           if(sub_mode == 2){
             if(song < 3)
               new_song = song+1;
             else 
               new_song = 1;
-            uLCD.cls();
-            uLCD.printf("Forward To \n\n\n\n\n");
-            uLCD.printf("%c",type[new_song]);
           }
-          if(sub_mode == 3){
-            uLCD.cls();
-            uLCD.printf("Change Songs\n\n\n\n\n");
-            uLCD.printf("%c\n",type[1]);
-            uLCD.printf("%c\n",type[2]);
-            uLCD.printf("%c\n",type[3]);
-          }  
         first = 0;  
         }
         if(sub_mode == 1){
